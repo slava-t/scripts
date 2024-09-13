@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu -o pipefail
+
+tee >(prefix=${1:-"-- "} bash -c 'sum=$(sha256sum -b);echo "$prefix$sum"')
+

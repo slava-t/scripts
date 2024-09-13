@@ -1,0 +1,4 @@
+#!/bin/bash
+rm -f ./sha256sum
+find . -type f -exec sha256sum "{}" + >/tmp/sha256sum
+cp /tmp/sha256sum ./
