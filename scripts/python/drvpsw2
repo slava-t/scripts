@@ -27,9 +27,9 @@ password = getpass.getpass('password:')
 
 start_time = time.time()
 
-id_hash = sha512(id)
-salt = id_hash[:64]
-f_salt = id_hash[::-1][:64]
+salt_src = sha512(f'{id} {psw_len}')
+salt = salt_src[:64]
+f_salt = salt_src[::-1][:64]
 
 print('generating...')
 full_derived_bytes = hashlib.scrypt(
@@ -44,9 +44,10 @@ full_derived_bytes = hashlib.scrypt(
 full_derived64 = base64.b64encode(full_derived_bytes).decode('utf-8')
 full_derived = full_derived64.replace('=', '').replace('/', '').replace('+', '')
 derived = full_derived[:psw_len]
-digest = sha512(derived)
+tail_len = len(full_derived) - len(derived)
+rev_tail = full_derived[::-1][:tail_len]
 fingerprint = hashlib.scrypt(
-  digest.encode('utf-8'),
+  rev_tail.encode('utf-8'),
   salt=bytes.fromhex(f_salt),
   n=n,
   r=r,
@@ -62,29 +63,34 @@ print(f'fingerprint: {fingerprint}')
               test vectors
               ------------
 ---
-'' 64 15 1 16
+'' 0064 15 1 16
 password: ''
-derived: ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS
-fingerprint: 2be6402
+derived: Shw02UlQFON4YXqLNVp7iFOKSlazflzzdLcxEvZPcy0x2faLuCLYgiInFcnrKYtw
+fingerprint: 770517f
 ---
 'abc123' 24 17 4 8
 password: 'abc123'
-derived: BVbCbl7QfZ9RLHVHjXs1vtfp
-fingerprint: 6cedf75
+derived: LCrwUMADyTDBiLHHjQTrn6d9
+fingerprint: 55fc31a
+---
+abc123 0023
+password: abc123
+derived: Oa3cI2eh5scqWR2u7JMa2dN
+fingerprint: d9a8bd0
 ---
 'passwordid'
 password: 'password'
-derived: hjj6c5RxZKzmZxtatMdkBz9d
-fingerprint: b268618
+derived: 3RoM93oLUmZgoiYo1JXoVAIA
+fingerprint: 5bf089a
 ---
 0123456789ABCDEF 32 12 2 16
 password: 'let me in'
-derived: s5Jk09SizsAT9zmWEti4w9sq732EpWlD
-fingerprint: 55f5816
+derived: oH3tpprpN2cW9tn6DeCcB0GiP7Q8N79o
+fingerprint: 6071846
 ---
 ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS 68
 password: 'ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS'
-derived: GmokdVKVdHwllaPUYAw2SX8Beno9PnbMM0MDYRliGXhnhZTJtbGw8dxeNVUuaJ00CalO
-fingerprint: 5467acd
+derived: 2Pvr0euzhWmlutaiu0qpm4Bs972uwXVT2OEozABBv8XyzOtHFbjRII9z7mmxkOAwOBEs
+fingerprint: 7b67bf0
 """
 

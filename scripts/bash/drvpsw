@@ -2,6 +2,7 @@
 set -eu -o pipefail
 id=${1:-default}
 len=${2:-24}
+len=$((10#$len))
 
 log_n=${3:-17}
 n=$((2**$log_n))
@@ -12,7 +13,7 @@ echo "memory: $((128*$n*$r*$p/(1024*1024)))M"
 
 
 
-gen_len=$((2*len))
+gen_len=$((2 * len))
 
 echo -n "password: "
 read -s password
@@ -21,17 +22,20 @@ echo
 start_time=$(date +%s)
 
 
-id_hash=$(echo -n "$id" | sha512sum -b - | awk '{print $1;}')
-salt=$(echo -n "$id_hash" | cut -c 1-64)
-f_salt=$(echo -n "$id_hash" | rev | cut -c 1-64)
+salt_src=$(echo -n "$id $len" | sha512sum -b - | awk '{print $1;}')
+salt=$(echo -n "$salt_src" | cut -c 1-64)
+f_salt=$(echo -n "$salt_src" | rev | cut -c 1-64)
 
 
 echo 'generating...'
 
 full_derived=$(openssl kdf -binary -keylen $gen_len -kdfopt pass:"$password" -kdfopt hexsalt:"$salt" -kdfopt n:"$n" -kdfopt r:"$r" -kdfopt p:"$p" SCRYPT | base64 | tr -d '=/+\n')
+full_len=${#full_derived}
+tail_len=$(($full_len - $len))
 derived=$(echo -n "$full_derived" | cut -c1-"$len" | tr -d '\n')
-digest=$(echo -n "$derived" | sha512sum -b - | awk '{print $1;}')
-fingerprint=$(openssl kdf -binary -keylen 8 -kdfopt pass:"$digest" -kdfopt hexsalt:"$f_salt" -kdfopt n:"$n" -kdfopt r:"$r" -kdfopt p:"$p" SCRYPT | xxd -p | cut -c1-7)
+rev_tail=$(echo -n "$full_derived" | rev | cut -c1-"$tail_len" | tr -d '\n')
+
+fingerprint=$(openssl kdf -binary -keylen 8 -kdfopt pass:"$rev_tail" -kdfopt hexsalt:"$f_salt" -kdfopt n:"$n" -kdfopt r:"$r" -kdfopt p:"$p" SCRYPT | xxd -p | cut -c1-7)
 
 end_time=$(date +%s)
 
@@ -43,28 +47,33 @@ echo "fingerprint: $fingerprint"
               test vectors
               ------------
 ---
-'' 64 15 1 16
+'' 0064 15 1 16
 password: ''
-derived: ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS
-fingerprint: 2be6402
+derived: Shw02UlQFON4YXqLNVp7iFOKSlazflzzdLcxEvZPcy0x2faLuCLYgiInFcnrKYtw
+fingerprint: 770517f
 ---
 'abc123' 24 17 4 8
 password: 'abc123'
-derived: BVbCbl7QfZ9RLHVHjXs1vtfp
-fingerprint: 6cedf75
+derived: LCrwUMADyTDBiLHHjQTrn6d9
+fingerprint: 55fc31a
+---
+abc123 0023
+password: abc123
+derived: Oa3cI2eh5scqWR2u7JMa2dN
+fingerprint: d9a8bd0
 ---
 'passwordid'
 password: 'password'
-derived: hjj6c5RxZKzmZxtatMdkBz9d
-fingerprint: b268618
+derived: 3RoM93oLUmZgoiYo1JXoVAIA
+fingerprint: 5bf089a
 ---
 0123456789ABCDEF 32 12 2 16
 password: 'let me in'
-derived: s5Jk09SizsAT9zmWEti4w9sq732EpWlD
-fingerprint: 55f5816
+derived: oH3tpprpN2cW9tn6DeCcB0GiP7Q8N79o
+fingerprint: 6071846
 ---
 ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS 68
 password: 'ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS'
-derived: GmokdVKVdHwllaPUYAw2SX8Beno9PnbMM0MDYRliGXhnhZTJtbGw8dxeNVUuaJ00CalO
-fingerprint: 5467acd
+derived: 2Pvr0euzhWmlutaiu0qpm4Bs972uwXVT2OEozABBv8XyzOtHFbjRII9z7mmxkOAwOBEs
+fingerprint: 7b67bf0
 "
