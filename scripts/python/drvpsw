@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import sys
+import time
+import hashlib
+import getpass
+import base64
+
+def sha512(s):
+  h = hashlib.sha512()
+  h.update(s.encode('utf-8'))
+  return h.hexdigest()
+
+argc = len(sys.argv)
+
+id = sys.argv[1] if argc > 1 and sys.argv[1] else 'default'
+psw_len = int(sys.argv[2] if argc > 2 else 24)
+log_n = int(sys.argv[3] if argc > 3 else 17)
+n = 2 ** log_n
+p = int(sys.argv[4] if argc > 4 else 4)
+r = int(sys.argv[5] if argc > 5 else 8)
+
+print(f'memory: {int(128 * n * r * p / 1024 / 1024)}M')
+
+gen_len = 2 * psw_len
+
+password = getpass.getpass('password:')
+
+start_time = time.time()
+
+id_hash = sha512(id)
+salt = id_hash[:64]
+f_salt = id_hash[::-1][:64]
+
+print('generating...')
+full_derived_bytes = hashlib.scrypt(
+  password.encode('utf-8'),
+  salt=bytes.fromhex(salt),
+  n=n,
+  r=r,
+  p=p,
+  maxmem=2 * 1024 * 1024 * 1024 - 1,
+  dklen=gen_len
+)
+full_derived64 = base64.b64encode(full_derived_bytes).decode('utf-8')
+full_derived = full_derived64.replace('=', '').replace('/', '').replace('+', '')
+derived = full_derived[:psw_len]
+digest = sha512(derived)
+fingerprint = hashlib.scrypt(
+  digest.encode('utf-8'),
+  salt=bytes.fromhex(f_salt),
+  n=n,
+  r=r,
+  p=p,
+  maxmem=1024 * 1024 * 1024,
+  dklen=8
+).hex()[:7]
+print(f'{round(time.time() - start_time)} seconds')
+print(f'derived: {derived}')
+print(f'fingerprint: {fingerprint}')
+
+"""
+              test vectors
+              ------------
+---
+'' 64 15 1 16
+password: ''
+derived: ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS
+fingerprint: 2be6402
+---
+'abc123' 24 17 4 8
+password: 'abc123'
+derived: BVbCbl7QfZ9RLHVHjXs1vtfp
+fingerprint: 6cedf75
+---
+'passwordid'
+password: 'password'
+derived: hjj6c5RxZKzmZxtatMdkBz9d
+fingerprint: b268618
+---
+0123456789ABCDEF 32 12 2 16
+password: 'let me in'
+derived: s5Jk09SizsAT9zmWEti4w9sq732EpWlD
+fingerprint: 55f5816
+---
+ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS 68
+password: 'ZJ6NkBktAgDfLTsMt1IJJKoNSG2tnsKP638E6kZQv4PhLlVtcgh8JzVCipwyklgS'
+derived: GmokdVKVdHwllaPUYAw2SX8Beno9PnbMM0MDYRliGXhnhZTJtbGw8dxeNVUuaJ00CalO
+fingerprint: 5467acd
+"""
+
